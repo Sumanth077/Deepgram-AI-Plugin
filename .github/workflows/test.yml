@@ -1,0 +1,54 @@
+name: Unit Test
+
+on:
+  pull_request:
+    branches:
+      - main
+      - staging
+
+  push:
+    branches:
+      - main
+      - staging
+
+jobs:
+  test:
+    name: Run Test Suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v2
+      - name: Open Web Client Directory
+        working-directory: test/data
+        run: |
+          ls -la
+      - name: Setup secrets file
+        shell: bash
+        env:
+          ASSEMBLY_API_TOKEN: ${{ secrets.API_KEY }}
+        run: |
+          mkdir -p src/.steamship/; echo -e "assembly_api_token =" "\"""$ASSEMBLY_API_TOKEN""\"" > src/.steamship/secrets.toml
+      - name: Setup Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: "3.10"
+      - name: Install Virtualenv
+        run: |
+          python3 -m venv .venv
+      - name: Activate Virtualenv
+        run: |
+          source .venv/bin/activate
+      - name: Install Dependencies
+        run: |
+          python -m pip install -r requirements.txt
+      - name: Install Development Dependencies
+        run: |
+          python -m pip install -r requirements.dev.txt
+      - name: Run test suite
+        run: |
+          pytest test/test_unit.py
+        env:
+          STEAMSHIP_API_KEY: ${{ github.ref == 'refs/heads/main' && secrets.STEAMSHIP_API_KEY || secrets.STEAMSHIP_API_KEY_STAGING  }}
+          STEAMSHIP_API_BASE: ${{ github.ref == 'refs/heads/main' && secrets.STEAMSHIP_API_KEY || secrets.STEAMSHIP_API_KEY_STAGING }}

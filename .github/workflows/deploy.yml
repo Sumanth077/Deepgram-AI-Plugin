@@ -1,0 +1,33 @@
+name: Deploy to Steamship
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+*'  # When a SemVer tag is pushed, prefixed by `v`. Tag must match steamship.json:version
+    branches:
+      - main                      # Upon push to `main`. The version will be read from steamship.json:version
+      - staging                   # Upon push to `staging`. The version will be read from steamship.json:version
+
+jobs:
+  deploy:
+    name: Deploy to Steamship
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Extract Branch
+        shell: bash
+        run: echo "##[set-output name=branch;]$(echo ${GITHUB_REF#refs/heads/})"
+        id: extract_branch
+      - name: Deploy to Steamship [Production]
+        if: ${{ (!(steps.extract_branch.outputs.branch == 'staging')) }}
+        uses: steamship-core/deploy-to-steamship@main
+        with:
+          steamship_key: ${{ secrets.STEAMSHIP_API_KEY }}
+          steamship_slack_notification_webhook: ${{ secrets.STEAMSHIP_SLACK_DEPLOYMENT_WEBHOOK }}
+      - name: Deploy to Steamship [Staging]
+        if: ${{ (steps.extract_branch.outputs.branch == 'staging') }}
+        uses: steamship-core/deploy-to-steamship@main
+        with:
+          steamship_key: ${{ secrets.STEAMSHIP_API_KEY_STAGING }}
+          steamship_api_base: ${{ secrets.STEAMSHIP_API_BASE_STAGING }}
+          steamship_slack_notification_webhook: ${{ secrets.STEAMSHIP_SLACK_DEPLOYMENT_WEBHOOK }}
