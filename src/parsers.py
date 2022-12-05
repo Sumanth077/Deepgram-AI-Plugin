@@ -27,14 +27,14 @@ def parse_timestamps(transcription_response):
     time_idx_to_char_idx = {}
     tags = []
     char_idx = 0
-    for word in transcription_response["words"]:
-        word_length = len(word["text"])
+    for word in transcription_response["results"]["channels"][0]["alternatives"][0]['words']:
+        word_length = len(word["word"])
         tags.append(
             Tag.CreateRequest(
                 kind="timestamp",
                 start_idx=char_idx,
                 end_idx=char_idx + word_length,
-                name=word["text"],
+                name=word["word"],
                 value={"start_time": word["start"], "end_time": word["end"]},
             )
         )
@@ -115,15 +115,12 @@ def parse_sentiments(transcription_response):
 def parse_topic_summaries(transcription_response):
     """Extract summary from transcription response."""
     tags = []
-    if "summary" in transcription_response.get("iab_categories_result", {}):
-        summary = transcription_response["iab_categories_result"]["summary"]
-        for topic, relevance in summary.items():
-            tags.append(
+    summary = transcription_response["results"]["channels"][0]["alternatives"][0]['summaries'][0]['summary']
+    tags.append(
                 Tag.CreateRequest(
                     kind="topic_summary",
-                    name=topic,
+                    name=summary,
                     value={
-                        "confidence": relevance,
                         "start_time": None,
                         "end_time": None,
                     },

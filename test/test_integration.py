@@ -1,4 +1,4 @@
-"""Test assemblyai-s2t-blockifier via integration tests."""
+"""Test deepgramai-s2t-blockifier via integration tests."""
 import random
 import string
 from test import TEST_DATA
@@ -8,14 +8,14 @@ import pytest
 from steamship import File, PluginInstance, Steamship, Task, TaskState
 from steamship.base.mime_types import MimeTypes
 
-BLOCKIFIER_HANDLE = "s2t-blockifier-default"
-ENVIRONMENT = "prod"
+BLOCKIFIER_HANDLE = "deepgram-s2t-blockifier"
+# ENVIRONMENT = "prod"
 
 
 @pytest.fixture
 def steamship() -> Steamship:
     """Instantiate a Steamship client."""
-    return Steamship(profile=ENVIRONMENT)
+    return Steamship()
 
 
 def random_name() -> str:
@@ -42,7 +42,7 @@ def plugin_instance(steamship: Steamship) -> PluginInstance:
 
 
 def test_blockifier(steamship: Steamship, plugin_instance: PluginInstance):
-    """Test the AssemblyAI Blockifier via an integration test."""
+    """Test the DeepgramAI Blockifier via an integration test."""
     audio_path = TEST_DATA / "test_conversation.mp3"
     file = File.create(steamship, content=audio_path.open("rb").read(), mime_type=MimeTypes.MP3)
 

@@ -1,8 +1,9 @@
-"""AssemblyAI speech-to-text blockifier.
+"""DeepgramAI speech-to-text blockifier.
 
 An audio file is loaded and converted into blocks, with tags added according to the plugin configuration.
 """
 import logging
+import json
 from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, Type, Union
@@ -14,11 +15,13 @@ from steamship.base import Task, TaskState
 from steamship.base.mime_types import MimeTypes
 from steamship.data.workspace import SignedUrl, Workspace
 from steamship.invocable import Config, InvocableResponse, create_handler
+from steamship.invocable.lambda_handler import create_safe_handler
 from steamship.plugin.blockifier import Blockifier
 from steamship.plugin.inputs.raw_data_plugin_input import RawDataPluginInput
 from steamship.plugin.outputs.block_and_tag_plugin_output import BlockAndTagPluginOutput
 from steamship.plugin.request import PluginRequest
 from steamship.utils.signed_urls import upload_to_signed_url
+from deepgram import Deepgram
 
 from parsers import (
     parse_chapters,
@@ -31,12 +34,10 @@ from parsers import (
 )
 
 
-class AssemblyAIBlockifierConfig(Config):
-    """Config object containing required configuration parameters to initialize a AssemblyAIBlockifier."""
+class DeepgramAIBlockifierConfig(Config):
+    """Config object containing required configuration parameters to initialize a DeepgramAIBlockifier."""
 
-    assembly_api_token: str
-    speaker_detection: bool = True
-    enable_audio_intelligence: bool = True
+    deepgram_api_token: str
 
 
 class TranscribeJobStatus(str, Enum):
@@ -48,16 +49,17 @@ class TranscribeJobStatus(str, Enum):
     ERROR = "error"
 
 
-class AssemblyAIBlockifier(Blockifier):
+
+class DeepgramAIBlockifier(Blockifier):
     """Blockifier that transcribes audio files into blocks.
 
     Attributes
     ----------
-    config : AssemblyAIBlockifierConfig
+    config : DeepgramAIBlockifierConfig
         The required configuration used to instantiate a amazon-s2t-blockifier
     """
 
-    config: AssemblyAIBlockifierConfig
+    config: DeepgramAIBlockifierConfig
 
     SUPPORTED_MIME_TYPES = (
         MimeTypes.MP3,
@@ -68,73 +70,57 @@ class AssemblyAIBlockifier(Blockifier):
         "video/webm",
     )
 
-    BASE_URL = "https://api.assemblyai.com/v2"
+    BASE_URL = "https://api.deepgram.com/v1"
     BASE_HEADERS = {
         "content-type": "application/json",
     }
 
     def config_cls(self) -> Type[Config]:
         """Return the Configuration class."""
-        return AssemblyAIBlockifierConfig
+        return DeepgramAIBlockifierConfig
 
     def run(
         self, request: PluginRequest[RawDataPluginInput]
     ) -> Union[InvocableResponse, InvocableResponse[BlockAndTagPluginOutput]]:
         """Transcribe the audio file, store the transcription results in blocks and tags."""
-        logging.info("AssemblyAI S2T Blockifier received run request.")
+        logging.info("DeepgramAI S2T Blockifier received run request.")
         if request.is_status_check:
             logging.info("Status check.")
 
             if "transcription_id" not in request.status.remote_status_input:
                 raise SteamshipError(message="Status check requests need to provide a valid job id")
             return self._check_transcription_status(
-                request.status.remote_status_input["transcription_id"]
-            )
-        else:
-            mime_type = self._check_mime_type(request)
-            signed_url = self._upload_audio_file(mime_type, request.data.data)
-            transcription_id = self._start_transcription(file_uri=signed_url)
-            return self._check_transcription_status(transcription_id)
+                request.status.remote_status_input.get("transcription_id"))
+
+        mime_type = self._check_mime_type(request)
+        signed_url = self._upload_audio_file(mime_type, request.data.data)
+        transcription_response = self._start_transcription(file_uri=signed_url)
+        return self._process_transcription_response(transcription_response)
 
     def _start_transcription(self, file_uri: str) -> str:
-        """Start to transcribe the audio file stored on s3 and return the transcription id."""
-        response = requests.post(
-            f"{self.BASE_URL}/transcript",
-            json={
-                "audio_url": file_uri,
-                "speaker_labels": self.config.speaker_detection,
-                "language_detection": True,
-                "auto_highlights": self.config.enable_audio_intelligence,
-                "iab_categories": self.config.enable_audio_intelligence,
-                "sentiment_analysis": self.config.enable_audio_intelligence,
-                "auto_chapters": self.config.enable_audio_intelligence,
-                "entity_detection": self.config.enable_audio_intelligence,
-            },
-            headers={"authorization": self.config.assembly_api_token, **self.BASE_HEADERS},
+        """Start to transcribe the audio file stored on s3 and return the JSON response."""
+        response = Deepgram(self.config.deepgram_api_token).transcription.sync_prerecorded(
+            source={
+                "url": file_uri},
+            options={"punctuate": True, "diarize": True, "detect_topics": True, "summarize": True, "model": "general"}
+
         )
-        return response.json().get("id")
+        return response
 
     def _process_transcription_response(
         self, transcription_response: Dict[str, Any]
     ) -> InvocableResponse:
-        timestamp_tags, time_idx_to_char_idx = parse_timestamps(transcription_response)
-
+        # timestamp_tags, time_idx_to_char_idx = parse_timestamps(transcription_response)
         tags = [
-            *timestamp_tags,
-            *parse_speaker_tags(transcription_response),
-            *parse_topics(transcription_response),
-            *parse_topic_summaries(transcription_response),
-            *parse_sentiments(transcription_response),
-            *parse_chapters(transcription_response, time_idx_to_char_idx),
-            *parse_entities(transcription_response, time_idx_to_char_idx),
+            # *timestamp_tags,
+            *parse_topic_summaries(transcription_response)
         ]
-
         return InvocableResponse(
             data=BlockAndTagPluginOutput(
                 file=File.CreateRequest(
                     blocks=[
                         Block.CreateRequest(
-                            text=transcription_response["text"],
+                            text=transcription_response["results"]["channels"][0]["alternatives"][0]['transcript'],
                             tags=tags,
                         )
                     ]
@@ -144,9 +130,10 @@ class AssemblyAIBlockifier(Blockifier):
 
     def _check_transcription_status(self, transcription_id: str) -> InvocableResponse:
         response = requests.get(
-            f"{self.BASE_URL}/transcript/{transcription_id}",
-            headers={"authorization": self.config.assembly_api_token, **self.BASE_HEADERS},
+            f"{self.BASE_URL}/listen/{transcription_id}",
+            headers={"authorization": self.config.deepgram_api_token, **self.BASE_HEADERS},
         )
+
         transcription_response = response.json()
         job_status = transcription_response["status"]
         logging.info(f"Job {transcription_id} has status {job_status}.")
@@ -160,7 +147,7 @@ class AssemblyAIBlockifier(Blockifier):
             else:
                 raise SteamshipError(
                     message="Transcription was unsuccessful. "
-                    "Please check Assembly AI for error message."
+                            "Please check Deepgram AI for error message."
                 )
         else:
             return InvocableResponse(
@@ -170,6 +157,7 @@ class AssemblyAIBlockifier(Blockifier):
                     remote_status_input={"transcription_id": transcription_id},
                 )
             )
+
 
     def _upload_audio_file(self, mime_type: str, data: bytes) -> str:
         media_format = mime_type.split("/")[1]
@@ -208,4 +196,4 @@ class AssemblyAIBlockifier(Blockifier):
         return mime_type
 
 
-handler = create_handler(AssemblyAIBlockifier)
+handler = create_safe_handler(DeepgramAIBlockifier)

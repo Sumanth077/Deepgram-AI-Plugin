@@ -8,7 +8,7 @@ from steamship import Tag
 
 def load_config() -> Dict[str, Any]:
     """Load config from test data."""
-    return json.load((TEST_DATA / "config.json").open())
+    return {}
 
 
 def verify_response(response) -> None:

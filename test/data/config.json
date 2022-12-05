@@ -1,4 +1,3 @@
 {
-  "speaker_detection": true,
-  "enable_audio_intelligence": true
+  "deepgram_api_token": true
 }
