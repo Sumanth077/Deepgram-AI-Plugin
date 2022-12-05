@@ -1,15 +1,11 @@
-# AssemblyAI Transcribe blockifier
+# DeepgramAI Transcribe blockifier
 
-This project contains a Steamship Blockifier that transcribes and analyzes audio files via AssemblyAI.
+This project contains a Steamship Blockifier that transcribes and analyzes audio files via DeepgramAI.
 
 ## Configuration
 
-This plugin must be configured with the following fields:
+This plugin is configured using an API key that is for running the Deepgram AI model. Those keys are supplied via secrets.
 
-| Parameter | Description | DType | Required |
-|-------------------|----------------------------------------------------|--------|--|
-| speaker_detection | Enable speaker detection | bool | False |
-| enable_audio_intelligence | Enable Audio Intelligence (note that this incurs a higher cost) | False |
 
 ## Getting Started
 
@@ -31,20 +27,18 @@ And then login with:
 from steamship import Steamship, File, MimeTypes
 from pathlib import Path
 
-PLUGIN_HANDLE = "assemblyai-s2t-blockifier"
-PLUGIN_CONFIG = {
-    "speaker_detection": True,
-    "enable_audio_intelligence": True
-}
+PLUGIN_HANDLE = "deepgram-s2t-blockifier"
+
 
 ship = Steamship()  # Without arguments, credentials in ~/.steamship.json will be used.
 audio_path = Path("FILL_IN")
 s2t_plugin_instance = ship.use_plugin(plugin_handle=PLUGIN_HANDLE)
 file = File.create(ship, content=audio_path.open("b").read(), mime_type=MimeTypes.MP3)
-tag_results = file.tag(plugin_instance=s2t_plugin_instance.handle)
-tag_results.wait()
+blockify_response = file.blockify(plugin_instance=s2t_plugin_instance.handle)
+blockify_response.wait(max_timeout_s=3600, retry_delay_s=1)
 
-file = tag_results.output.file
+file = file.refresh()
+
 for block in file.blocks:
     print(block.text)
 ```
