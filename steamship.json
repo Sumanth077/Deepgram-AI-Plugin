@@ -1,11 +1,11 @@
 {
   "author": "",
   "entrypoint": "src.api.handler",
-  "handle": "deepgram-s2t-blockifier",
+  "handle": "deepgram-s2t-blockifier-2",
   "description": "Blockify audio via Deepgram AI",
   "public": true,
   "type": "plugin",
-  "version": "2.2.7",
+  "version": "2.2.8",
   "plugin": {
     "isTrainable": false,
     "transport": "jsonOverHttp",
