@@ -3,34 +3,26 @@
 An audio file is loaded and converted into blocks, with tags added according to the plugin configuration.
 """
 import logging
-import json
 from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, Type, Union
 from uuid import uuid4
 
 import requests
+from deepgram import Deepgram
 from steamship import Block, File, Steamship, SteamshipError
 from steamship.base import Task, TaskState
 from steamship.base.mime_types import MimeTypes
 from steamship.data.workspace import SignedUrl, Workspace
-from steamship.invocable import Config, InvocableResponse, create_handler
-from steamship.invocable.lambda_handler import create_safe_handler
+from steamship.invocable import Config, InvocableResponse
 from steamship.plugin.blockifier import Blockifier
 from steamship.plugin.inputs.raw_data_plugin_input import RawDataPluginInput
 from steamship.plugin.outputs.block_and_tag_plugin_output import BlockAndTagPluginOutput
 from steamship.plugin.request import PluginRequest
 from steamship.utils.signed_urls import upload_to_signed_url
-from deepgram import Deepgram
 
 from parsers import (
-    parse_chapters,
-    parse_entities,
-    parse_sentiments,
-    parse_speaker_tags,
-    parse_timestamps,
     parse_topic_summaries,
-    parse_topics,
 )
 
 
@@ -47,7 +39,6 @@ class TranscribeJobStatus(str, Enum):
     PROCESSING = "processing"
     COMPLETED = "completed"
     ERROR = "error"
-
 
 
 class DeepgramAIBlockifier(Blockifier):
@@ -80,7 +71,7 @@ class DeepgramAIBlockifier(Blockifier):
         return DeepgramAIBlockifierConfig
 
     def run(
-        self, request: PluginRequest[RawDataPluginInput]
+            self, request: PluginRequest[RawDataPluginInput]
     ) -> Union[InvocableResponse, InvocableResponse[BlockAndTagPluginOutput]]:
         """Transcribe the audio file, store the transcription results in blocks and tags."""
         logging.info("DeepgramAI S2T Blockifier received run request.")
@@ -108,7 +99,7 @@ class DeepgramAIBlockifier(Blockifier):
         return response
 
     def _process_transcription_response(
-        self, transcription_response: Dict[str, Any]
+            self, transcription_response: Dict[str, Any]
     ) -> InvocableResponse:
         # timestamp_tags, time_idx_to_char_idx = parse_timestamps(transcription_response)
         tags = [
@@ -158,7 +149,6 @@ class DeepgramAIBlockifier(Blockifier):
                 )
             )
 
-
     def _upload_audio_file(self, mime_type: str, data: bytes) -> str:
         media_format = mime_type.split("/")[1]
         unique_file_id = f"{datetime.now().strftime('%Y-%m-%d-%H-%M-%S')}-{uuid4()}.{media_format}"
@@ -194,6 +184,3 @@ class DeepgramAIBlockifier(Blockifier):
                 f"The following mimeTypes are supported: {self.SUPPORTED_MIME_TYPES}"
             )
         return mime_type
-
-
-handler = create_safe_handler(DeepgramAIBlockifier)

@@ -1,15 +1,15 @@
 """Test deepgramai-s2t-blockifier via integration tests."""
 import random
 import string
-from test import TEST_DATA
-from test.utils import load_config, verify_file
 
 import pytest
 from steamship import File, PluginInstance, Steamship, Task, TaskState
 from steamship.base.mime_types import MimeTypes
 
-BLOCKIFIER_HANDLE = "deepgram-s2t-blockifier"
-# ENVIRONMENT = "prod"
+from test import TEST_DATA
+from test.utils import load_config, verify_file
+
+BLOCKIFIER_HANDLE = "deepgram-s2t-blockifier-2"
 
 
 @pytest.fixture
