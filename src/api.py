@@ -55,10 +55,10 @@ class DeepgramAIBlockifier(Blockifier):
     SUPPORTED_MIME_TYPES = (
         MimeTypes.MP3,
         MimeTypes.WAV,
-        "video/mp4",
-        "audio/mp4",
-        "audio/webm",
-        "video/webm",
+        MimeTypes.MP4_VIDEO,
+        MimeTypes.MP4_AUDIO,
+        MimeTypes.WEBM_AUDIO,
+        MimeTypes.WEBM_VIDEO
     )
 
     BASE_URL = "https://api.deepgram.com/v1"
