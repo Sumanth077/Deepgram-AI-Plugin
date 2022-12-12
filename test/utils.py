@@ -27,6 +27,7 @@ def verify_file(file) -> None:
     assert file.blocks[0] is not None
     block = file.blocks[0]
     assert block.text is not None
+    print(block.text)
     verify_block_tags(block)
 
 
