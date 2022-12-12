@@ -3,3 +3,4 @@
 .DS_Store
 build/
 .ipynb_checkpoints/
+src/.steamship/secrets.toml
